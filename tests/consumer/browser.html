@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Trama · package check</title>
+  <h1>Trama · package check</h1>
+  <p id="result" role="status">Loading the built entry points…</p>
+  <p>This check runs a core session without React.</p>
+  <script type="importmap">
+    {
+      "imports": {
+        "trama-forms/core": "./dist/core/index.js",
+        "trama-forms/react": "./dist/react/index.js"
+      }
+    }
+  </script>
+  <script type="module">
+    try {
+      const { defineForm, field, createSession } = await import("trama-forms/core");
+      const definition = defineForm({
+        fields: { quantity: field.number(), price: field.number(), total: field.number() },
+        rules: { total: { value: ({ quantity, price }) => quantity * price } },
+      });
+      const session = createSession(definition, { initial: { quantity: 2, price: 10 } });
+      const expectTotal = (expected) => {
+        if (session.getSnapshot().values.total !== expected)
+          throw new Error("Incorrect total, expected " + expected);
+      };
+      expectTotal(20);
+      session.edit("total", 25);
+      expectTotal(25);
+      session.edit("quantity", 3);
+      expectTotal(30);
+      session.reset();
+      expectTotal(20);
+      const address = defineForm({
+        fields: {
+          country: field.text(),
+          city: field.text(),
+          suggestedCity: field.text(),
+          useSuggestion: field.checkbox(),
+        },
+        rules: {
+          country: {
+            onChange: ({ useSuggestion, suggestedCity }, { toDefaults }) =>
+              useSuggestion ? { city: suggestedCity } : toDefaults("city"),
+          },
+        },
+      });
+      const location = createSession(address, {
+        initial: { country: "ES", city: "Madrid", suggestedCity: "Mexico City" },
+      });
+      const expectCity = (expected) => {
+        if (location.getSnapshot().values.city !== expected)
+          throw new Error("Incorrect city, expected " + expected);
+      };
+      expectCity("Madrid");
+      location.edit("country", "MX");
+      expectCity("");
+      location.edit("useSuggestion", true);
+      location.edit("suggestedCity", "Tokyo");
+      expectCity("");
+      location.edit("country", "JP");
+      expectCity("Tokyo");
+      location.reset();
+      expectCity("Madrid");
+      if (location.getSnapshot().values.country !== "ES")
+        throw new Error("Country was not restored");
+      const note = createSession(
+        defineForm({
+          fields: { locked: field.checkbox(), includeNote: field.checkbox(), note: field.text() },
+          rules: {
+            note: {
+              disabled: [({ locked }) => locked, ({ includeNote }) => !includeNote, () => false],
+            },
+          },
+        }),
+        { initial: { locked: true, note: "Saved" } },
+      );
+      const expectNote = (disabled, value) => {
+        const snapshot = note.getSnapshot();
+        if (snapshot.fieldStates.note.disabled !== disabled || snapshot.values.note !== value)
+          throw new Error("Incorrect note state or value");
+      };
+      expectNote(true, "Saved");
+      note.edit("includeNote", true);
+      expectNote(true, "Saved");
+      note.edit("note", "Imported");
+      expectNote(true, "Imported");
+      note.edit("locked", false);
+      expectNote(false, "Imported");
+      note.reset();
+      expectNote(true, "Saved");
+      const order = createSession(
+        defineForm({
+          fields: { total: field.number() },
+          collections: { lines: { fields: { amount: field.number() } } },
+          rules: {
+            total: { value: ({ lines }) => lines.reduce((sum, line) => sum + line.amount, 0) },
+          },
+        }),
+        { initial: { lines: [{ amount: 2 }, { amount: 3 }] } },
+      );
+      const opened = order.getSnapshot().rows.lines;
+      const [added] = order.add("lines", [{ amount: 5 }], { at: 0 });
+      order.move("lines", added, 2);
+      order.row("lines", opened[0]).edit("amount", 4);
+      const moved = order.getSnapshot();
+      if (moved.values.total !== 12 || moved.rows.lines[2] !== added)
+        throw new Error("Incorrect rows");
+      order.reset();
+      if (order.getSnapshot().values.total !== 5 || order.getSnapshot().rows.lines !== opened)
+        throw new Error("Rows were not restored");
+      const failures = [];
+      const catchError = (event) => {
+        failures.push(event.error);
+        event.preventDefault();
+      };
+      window.addEventListener("error", catchError);
+      const original = new Error("Observer browser failure");
+      session.subscribe(() => {
+        throw original;
+      });
+      session.subscribe(() => session.edit("total", 99));
+      session.subscribe(() => session.reset());
+      let observed;
+      session.subscribe(() => {
+        observed = session.getSnapshot().values.total;
+      });
+      session.edit("quantity", 4);
+      expectTotal(40);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      window.removeEventListener("error", catchError);
+      if (
+        observed !== 40 ||
+        failures.length !== 3 ||
+        failures[0] !== original ||
+        !/edit.*notification/.test(failures[1].message) ||
+        !/reset.*notification/.test(failures[2].message)
+      )
+        throw new Error("Incorrect observer isolation or reporting");
+      document.querySelector("#result").textContent =
+        "Passed with the installed ESM package without React. Total 20 → 25 → 30 → reset to 20. City Madrid → cleared → Tokyo written → reset to ES/Madrid. Note Saved (disabled) → one condition removed independently → Imported (disabled) → enabled → reset to Saved (disabled). Row total 5 → add, move, and edit to 12 → reset to 5 with row keys restored. The session published 40, the browser reported three observer errors, and the remaining observers were notified.";
+
+      const outputSession = createSession(
+        defineForm({
+          fields: {
+            amount: field.number({ default: 20 }),
+            fail: field.checkbox(),
+            other: field.text(),
+          },
+          outputs: ({ output }) => {
+            const amount = output((values) => {
+              if (values.fail) throw new Error("Calculation browser failure");
+              return { rounded: Math.round(values.amount), nested: [1n, undefined, NaN] };
+            });
+            const caption = output((_, { read }) => `${read(amount).rounded} units`);
+            return { amount, caption, safe: output((values) => values.other) };
+          },
+        }),
+      );
+      const outputValues = [];
+      const outputErrors = [];
+      const stopOutputs = outputSession.watchOutputs(({ caption }) => outputValues.push(caption), {
+        onError: (error) => outputErrors.push(error),
+      });
+      let protectedValue;
+      outputSession.watchOutputs(({ amount }) => {
+        protectedValue = amount;
+      })();
+      outputSession.edit("amount", 20.1);
+      let protectionError;
+      outputSession.watchOutputs(
+        ({ amount }) => {
+          if (
+            amount !== protectedValue ||
+            amount.nested[0] !== 1n ||
+            amount.nested[1] !== undefined ||
+            !Number.isNaN(amount.nested[2]) ||
+            Reflect.set(amount.nested, "0", 2n)
+          )
+            throw new Error("Output ownership/equality");
+        },
+        {
+          onError: (error) => {
+            protectionError = error;
+          },
+        },
+      )();
+      if (protectionError) throw protectionError;
+      outputSession.edit("fail", true);
+      outputSession.edit("other", "Available");
+      outputSession.edit("fail", false);
+      outputSession.reset();
+      if (
+        outputValues.join("|") !== "20 units|20 units" ||
+        outputErrors.length !== 1 ||
+        !/caption/.test(outputErrors[0].message) ||
+        !/amount/.test(outputErrors[0].cause.message)
+      )
+        throw new Error("Output isolation/recovery");
+      stopOutputs();
+
+      failures.length = 0;
+      window.addEventListener("error", catchError);
+      const handlerFailure = new Error("Output handler browser failure");
+      const stopImmediate = outputSession.watchOutputs(({ caption }) => {
+        void caption;
+        throw original;
+      });
+      const stopHandler = outputSession.watchOutputs(
+        ({ caption }) => {
+          void caption;
+          throw original;
+        },
+        {
+          onError: () => {
+            throw handlerFailure;
+          },
+        },
+      );
+      const stopReentrant = outputSession.watchOutputs(
+        ({ caption }) => {
+          void caption;
+          outputSession.edit("amount", 99);
+        },
+        {
+          onError: () => outputSession.reset(),
+        },
+      );
+      let healthy;
+      outputSession.watchOutputs(({ caption }) => {
+        healthy = caption;
+      });
+      outputSession.edit("amount", 21);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      stopImmediate();
+      stopHandler();
+      stopReentrant();
+      window.removeEventListener("error", catchError);
+      if (
+        failures.length !== 6 ||
+        failures[0] !== original ||
+        failures[1] !== handlerFailure ||
+        !/reset.*notification/.test(failures[2].message) ||
+        healthy !== "21 units"
+      )
+        throw new Error("Output browser reporting/unsubscribe");
+      outputSession.edit("amount", 22);
+      document.querySelector("#result").textContent +=
+        " Outputs passed deep equality for non-JSON values and ownership checks. The failure was isolated and the same successful value was reported on recovery. The browser reported six errors, including the initial callback and handler errors. Reentrant operations were rejected and unsubscriptions were preserved.";
+      document.body.dataset.status = "passed";
+    } catch (error) {
+      document.querySelector("#result").textContent = String(error);
+      document.body.dataset.status = "failed";
+    }
+  </script>
+</html>

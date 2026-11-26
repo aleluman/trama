@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Trama: technical document</title>
+  <style>{{styles}}</style>
+</head>
+<body>
+  <a class="skip" href="#document">Skip to the document</a>
+  <header class="toolbar">
+    <span>Trama · Technical document</span>
+    <div>
+      <button id="toc-toggle" type="button" aria-controls="toc" aria-expanded="false">Contents</button>
+      <button id="print" type="button">Print / PDF</button>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" id="toc">
+      <nav aria-label="Document table of contents">
+        <p class="nav-label">Contents</p>
+        {{toc}}
+      </nav>
+    </aside>
+    <main id="document">
+      {{body}}
+      <footer>Trama · Standalone HTML.</footer>
+    </main>
+  </div>
+  <script>{{reader}}</script>
+</body>
+</html>

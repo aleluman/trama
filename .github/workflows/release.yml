@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # Releases come from the repository named in package.json.
+    if: github.repository == 'aleluman/trama'
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.npm.outputs.published }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check that the tag matches the package version
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - name: Check whether the version is already on npm
+        id: npm
+        run: |
+          if npm view "trama-forms@$(node -p 'require("./package.json").version')" version > /dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+      - run: pnpm run check
+      - run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: trama-forms-*.tgz
+
+  publish:
+    needs: check
+    if: needs.check.outputs.published == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Trusted publishing: npm authenticates only this job through OIDC, with no stored token.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later.
+      - run: npm install --global npm@^11.5.1
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+      # --provenance fails the publish instead of releasing a version without an attestation.
+      - run: npm publish ./trama-forms-*.tgz --provenance

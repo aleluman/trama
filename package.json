@@ -1,0 +1,79 @@
+{
+  "name": "trama-forms",
+  "version": "0.1.0",
+  "description": "Declarative forms library for modern browsers.",
+  "keywords": [
+    "declarative",
+    "forms",
+    "react",
+    "typescript",
+    "validation"
+  ],
+  "homepage": "https://github.com/aleluman/trama#readme",
+  "bugs": {
+    "url": "https://github.com/aleluman/trama/issues"
+  },
+  "license": "MIT",
+  "author": "Alejandro Luman",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aleluman/trama.git"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "pnpm run build && tsc -p docs/site/tsconfig.json",
+    "lint": "oxlint src scripts tests docs/site vite.config.mjs docs/technical/reader.js",
+    "format": "oxfmt 'src/**' 'scripts/**' 'tests/**' 'docs/site/**' vite.config.mjs docs/technical/reader.js '*.json' '.*.json' '*.yaml'",
+    "format:check": "oxfmt --check 'src/**' 'scripts/**' 'tests/**' 'docs/site/**' vite.config.mjs docs/technical/reader.js '*.json' '.*.json' '*.yaml'",
+    "test": "pnpm run build && node --test tests/*.test.mjs",
+    "docs:build": "node scripts/build-docs.mjs",
+    "docs:check": "node scripts/build-docs.mjs --check",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm test && pnpm run docs:site && pnpm run docs:check",
+    "prepack": "pnpm run build",
+    "docs:dev": "pnpm run build && vite",
+    "docs:site": "pnpm run build && vite build",
+    "docs:preview": "vite preview",
+    "build:watch": "node scripts/watch-build.mjs"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "5.96.0",
+    "@types/node": "24.13.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "jsdom": "30.1.0",
+    "oxc-transform-react": "0.145.0",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "oxlint-tsgolint": "7.0.2002",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "shiki": "4.4.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  },
+  "peerDependencies": {
+    "react": "^19.3.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "packageManager": "pnpm@12.4.2"
+}
