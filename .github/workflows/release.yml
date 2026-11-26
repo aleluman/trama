@@ -40,6 +40,10 @@ jobs:
         with:
           name: package
           path: trama-forms-*.tgz
+      # pnpm run check builds the guide, with relative asset paths, in .artifacts/site.
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: .artifacts/site
 
   stage:
     needs: check
@@ -63,3 +67,23 @@ jobs:
       # The trusted publisher is stage-only: the version stays private until a maintainer approves it on npmjs.com
       # with two-factor authentication. --provenance fails the job instead of staging a version without an attestation.
       - run: npm stage publish ./trama-forms-*.tgz --provenance
+
+  guide:
+    needs: [check, stage]
+    # The published guide documents the version on npm. It is not deployed if staging fails, and it is deployed
+    # again when the workflow runs for a version that is already on npm.
+    if: ${{ !cancelled() && needs.check.result == 'success' && (needs.stage.result == 'success' || needs.stage.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    # The github-pages environment accepts only v* tags.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

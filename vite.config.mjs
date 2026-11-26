@@ -57,8 +57,14 @@ const highlightSnippets = {
   },
 };
 
+// The guide shows the version of the package it documents.
+const { version } = JSON.parse(await readFile(new URL("package.json", import.meta.url), "utf8"));
+
 export default defineConfig({
   root: "docs/site",
+  // Relative asset paths, so the same build works at the root and under the GitHub Pages subpath.
+  base: "./",
+  define: { "import.meta.env.TRAMA_VERSION": JSON.stringify(version) },
   plugins: [
     highlightSource,
     highlightSnippets,

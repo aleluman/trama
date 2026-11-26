@@ -85,7 +85,7 @@ export const App = () => {
       <aside className={menuOpen ? "sidebar open" : "sidebar"}>
         <div className="sidebar-top">
           <a className="brand" href="#/">
-            Trama <span>guide</span>
+            Trama <span>{`guide · ${import.meta.env.TRAMA_VERSION}`}</span>
           </a>
           <button
             type="button"

@@ -205,7 +205,7 @@ test("the installed binding verifies state and readiness with React, real TanSta
   await runTests("tests/integral-react.test.mjs", consumer);
 });
 
-test("builds the guide with its demos by resolving Trama from the installed tarball", async () => {
+test("builds the guide from the tarball, with relative assets for Pages and its version", async () => {
   await cp(path.join(root, "tsconfig.json"), path.join(consumer, "tsconfig.json"));
   await run(
     process.execPath,
@@ -221,7 +221,11 @@ test("builds the guide with its demos by resolving Trama from the installed tarb
     ],
     { cwd: consumer },
   );
-  assert.match(await readFile(path.join(artifacts, "site/index.html"), "utf8"), /assets\//u);
+  const html = await readFile(path.join(artifacts, "site/index.html"), "utf8");
+  assert.doesNotMatch(html, /(?:src|href)="(?!\.\/assets\/)/u);
+  const [, script] = /<script type="module"[^>]* src="([^"]+)"/u.exec(html);
+  const bundle = await readFile(path.join(artifacts, "site", script), "utf8");
+  assert.ok(bundle.includes(`guide · ${manifest.version}`));
 });
 
 test("prepares a native browser check from the same installed artifact", async () => {
