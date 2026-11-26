@@ -24,6 +24,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Check that the tag matches the package version
         run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      # A staged version is not public until it is approved, so this check does not see it. A rerun before
+      # approval stages again, and npm rejects it because the staged version reserves its number.
       - name: Check whether the version is already on npm
         id: npm
         run: |
@@ -39,7 +41,7 @@ jobs:
           name: package
           path: trama-forms-*.tgz
 
-  publish:
+  stage:
     needs: check
     if: needs.check.outputs.published == 'false'
     runs-on: ubuntu-latest
@@ -53,10 +55,11 @@ jobs:
         with:
           node-version-file: .node-version
           registry-url: https://registry.npmjs.org
-      # Trusted publishing needs npm 11.5.1 or later.
-      - run: npm install --global npm@^11.5.1
+      # Staged publishing needs npm 11.15.0 or later.
+      - run: npm install --global npm@^11.15.0
       - uses: actions/download-artifact@v4
         with:
           name: package
-      # --provenance fails the publish instead of releasing a version without an attestation.
-      - run: npm publish ./trama-forms-*.tgz --provenance
+      # The trusted publisher is stage-only: the version stays private until a maintainer approves it on npmjs.com
+      # with two-factor authentication. --provenance fails the job instead of staging a version without an attestation.
+      - run: npm stage publish ./trama-forms-*.tgz --provenance
